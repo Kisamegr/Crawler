@@ -11,6 +11,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.MongoClient;
+import com.mongodb.MongoException;
 
 public class MongoDB {
 
@@ -29,6 +30,12 @@ public class MongoDB {
 			e.printStackTrace();
 		}
 
+		DB db = mongoClient.getDB("twitter");
+
+		DBCollection coll = db.getCollection("trends");
+		
+		coll.createIndex(new BasicDBObject("name", 1), new BasicDBObject("unique", true));
+		
 		oldTrends = new ArrayList<>();
 
 	}
@@ -36,14 +43,20 @@ public class MongoDB {
 	public void addTrend(Trends trends) {
 
 		Date now = new Date();
-
+		
+		
 		DB db = mongoClient.getDB("twitter");
 
 		DBCollection coll = db.getCollection("trends");
 
 		for (Trend t : trends.getTrends()) {
 			System.out.println(t.getName());
-			coll.insert(new BasicDBObject("name", t.getName()).append("arrival", now).append("withdrawal", "not-finished"));
+			
+			try{
+				coll.insert(new BasicDBObject("name", t.getName()).append("arrival", now).append("withdrawal", "not-finished"));
+			}
+			catch(MongoException e){
+			}
 		}
 
 		if (!oldTrends.isEmpty()) {
@@ -59,7 +72,6 @@ public class MongoDB {
 						coll.update(searchQuery, newDocument);
 						break;
 					}
-
 				}
 			}
 		}
