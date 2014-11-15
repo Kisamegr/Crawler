@@ -10,12 +10,17 @@ import twitter4j.Trends;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
+import com.mongodb.DBCursor;
+import com.mongodb.DBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoException;
 
 public class MongoDB {
 
 	MongoClient mongoClient;
+	DB db;
+	DBCollection trendsColl;
+	DBCollection statusColl;
 
 	ArrayList<Trend> oldTrends;
 
@@ -30,11 +35,12 @@ public class MongoDB {
 			e.printStackTrace();
 		}
 
-		DB db = mongoClient.getDB("twitter");
+		db = mongoClient.getDB("twitter");
 
-		DBCollection coll = db.getCollection("trends");
+		trendsColl = db.getCollection("trends");
+		statusColl = db.getCollection("statuses");
 
-		coll.createIndex(new BasicDBObject("name", 1), new BasicDBObject("unique", true));
+		trendsColl.createIndex(new BasicDBObject("name", 1), new BasicDBObject("unique", true));
 
 		oldTrends = new ArrayList<>();
 
@@ -53,6 +59,7 @@ public class MongoDB {
 			try {
 				coll.insert(new BasicDBObject("name", t.getName()).append("arrival", now).append("withdrawal", "not-finished"));
 			} catch (MongoException e) {
+
 			}
 		}
 
@@ -98,4 +105,28 @@ public class MongoDB {
 		}
 
 	}
+
+	public ArrayList<String> getActiveTrends() {
+
+		ArrayList<String> trends = new ArrayList<>();
+
+		DB db = mongoClient.getDB("twitter");
+
+		DBCollection coll = db.getCollection("trends");
+
+		BasicDBObject query = new BasicDBObject();
+
+		query.put("withdrawal", new BasicDBObject("$gte", "not-finished").append("$gte", new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 2)));
+
+		DBCursor cursor = trendsColl.find(query);
+
+		while (cursor.hasNext()) {
+			DBObject o = cursor.next();
+
+			trends.add(o.get("name").toString());
+		}
+
+		return trends;
+	}
+
 }
