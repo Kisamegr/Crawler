@@ -14,6 +14,7 @@ import com.mongodb.DBCursor;
 import com.mongodb.DBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoException;
+import com.mongodb.util.JSON;
 
 public class MongoDB {
 
@@ -48,16 +49,16 @@ public class MongoDB {
 
 	public void updateTrends(Trends trends, Date now) {
 
-		DB db = mongoClient.getDB("twitter");
+		// DB db = mongoClient.getDB("twitter");
 
-		DBCollection coll = db.getCollection("trends");
+		// DBCollection coll = db.getCollection("trends");
 
 		System.out.println("Trends: ");
 		for (Trend t : trends.getTrends()) {
 			System.out.println(t.getName());
 
 			try {
-				coll.insert(new BasicDBObject("name", t.getName()).append("arrival", now).append("withdrawal", "not-finished"));
+				trendsColl.insert(new BasicDBObject("name", t.getName()).append("arrival", now).append("withdrawal", "not-finished"));
 			} catch (MongoException e) {
 
 			}
@@ -91,7 +92,7 @@ public class MongoDB {
 
 					BasicDBObject searchQuery = new BasicDBObject().append("name", old.getName());
 
-					coll.update(searchQuery, newDocument);
+					trendsColl.update(searchQuery, newDocument);
 
 					System.out.println("Changing " + old.getName() + " to finished");
 				}
@@ -114,19 +115,31 @@ public class MongoDB {
 
 		DBCollection coll = db.getCollection("trends");
 
-		BasicDBObject query = new BasicDBObject();
-
-		query.put("withdrawal", new BasicDBObject("$gte", "not-finished").append("$gte", new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 2)));
+		BasicDBObject query = new BasicDBObject("withdrawal", "not-finished");
+		// new BasicDBObject("$gte", "not-finished").append("$gte", new
+		// Date(System.currentTimeMillis() - 1000 * 60 * 60 * 2)));
 
 		DBCursor cursor = trendsColl.find(query);
 
 		while (cursor.hasNext()) {
 			DBObject o = cursor.next();
-
 			trends.add(o.get("name").toString());
 		}
 
 		return trends;
+	}
+
+	public void addStatus(String statusJson) {
+
+		DBObject status = (DBObject) JSON.parse(statusJson);
+
+		// System.out.println(statusJson);
+		try {
+			statusColl.insert(status);
+
+		} catch (MongoException e) {
+			e.printStackTrace();
+		}
 	}
 
 }

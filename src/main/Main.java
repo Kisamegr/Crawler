@@ -15,6 +15,7 @@ import twitter4j.Trends;
 import twitter4j.Twitter;
 import twitter4j.TwitterException;
 import twitter4j.TwitterFactory;
+import twitter4j.TwitterObjectFactory;
 import twitter4j.TwitterStream;
 import twitter4j.TwitterStreamFactory;
 import twitter4j.conf.ConfigurationBuilder;
@@ -37,13 +38,12 @@ public class Main {
 		@Override
 		public void onException(Exception arg0) {
 			// TODO Auto-generated method stub
-
+			arg0.printStackTrace();
 		}
 
 		@Override
 		public void onDeletionNotice(StatusDeletionNotice arg0) {
 			// TODO Auto-generated method stub
-
 		}
 
 		@Override
@@ -59,15 +59,22 @@ public class Main {
 		}
 
 		@Override
-		public void onStatus(Status arg0) {
-			// TODO Auto-generated method stub
+		public void onStatus(final Status arg0) {
+			final String s = TwitterObjectFactory.getRawJSON(arg0);
+			threadPool.submit(new Runnable() {
 
+				@Override
+				public void run() {
+					mongo.addStatus(s);
+				}
+
+			});
+			// System.out.println(TwitterObjectFactory.getRawJSON(arg0));
 		}
 
 		@Override
 		public void onTrackLimitationNotice(int arg0) {
 			// TODO Auto-generated method stub
-
 		}
 
 	}
@@ -86,7 +93,13 @@ public class Main {
 
 		twitter = new TwitterFactory(cb.build()).getInstance();
 
-		twitterStream = new TwitterStreamFactory(cb.build()).getInstance();
+		ConfigurationBuilder cbs = new ConfigurationBuilder();
+		cbs.setPrettyDebugEnabled(true).setOAuthConsumerKey("3c1m6Ui0nK5UF9cDZ9ODOEKL6").setOAuthConsumerSecret("PszUJ0IepNaLVYVMjZxTtVDZHuk8lJvaDrv1ohN22ruTEHbjZD").setOAuthAccessToken("2693882078-1Kx8nF7IsYLMCxja44LCTOcHnKoyHTdEwGmUHgQ").setOAuthAccessTokenSecret("BrnTB3kn99vaoc3714NJmKJxbuWRIuJAtwjtFZWeiQssb");
+		cbs.setJSONStoreEnabled(true);
+
+		twitterStream = new TwitterStreamFactory(cbs.build()).getInstance();
+		// twitterStream = new TwitterStreamFactory().getInstance();
+		twitterStream.addListener(new StatusHandler());
 
 		timer = new Timer();
 
@@ -95,37 +108,46 @@ public class Main {
 			@Override
 			public void run() {
 
+				Trends trends = null;
+
+				try {
+					trends = twitter.getPlaceTrends(1);
+				} catch (TwitterException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+
+				System.out.println("----------- ITERATION " + count + " -----------");
+
+				mongo.updateTrends(trends, trends.getTrendAt());
+
+				System.out.println("\n\n");
+
+				ArrayList<String> activeTrends = mongo.getActiveTrends();
+
+				String[] array = new String[activeTrends.size()];
+				array = activeTrends.toArray(array);
+
+				final FilterQuery filter = new FilterQuery();
+				filter.track(array);
+
 				threadPool.submit(new Runnable() {
 
 					@Override
 					public void run() {
 						// TODO Auto-generated method stub
+						twitterStream.filter(filter);
 
-						Trends trends = null;
-
-						try {
-							trends = twitter.getPlaceTrends(1);
-						} catch (TwitterException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-
-						System.out.println("----------- ITERATION " + count + " -----------");
-
-						mongo.updateTrends(trends, trends.getTrendAt());
-
-						System.out.println("\n\n");
-
-						ArrayList<String> activeTrends = mongo.getActiveTrends();
-
-						FilterQuery filter = new FilterQuery();
-						filter.track(activeTrends.toArray(new String[activeTrends.size()]));
-
-						count++;
-
+						// twitterStream.sample();
 					}
 
 				});
+				System.out.println("-=-=-=-=-=-= ARRRRRRRRRRAY");
+				for (int i = 0; i < activeTrends.size(); i++) {
+					System.out.println(activeTrends.get(i));
+				}
+				count++;
+
 			}
 
 		}, 0, 60 * 1000);
