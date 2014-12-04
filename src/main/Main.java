@@ -117,7 +117,7 @@ public class Main {
 					e.printStackTrace();
 				}
 
-				System.out.println("----------- ITERATION " + count + " -----------");
+				System.out.println("\n\n\n\n\n----------- ITERATION " + count + " -----------");
 
 				mongo.updateTrends(trends, trends.getTrendAt());
 
@@ -142,7 +142,7 @@ public class Main {
 					}
 
 				});
-				System.out.println("-=-=-=-=-=-= ARRRRRRRRRRAY");
+				System.out.println("-=-=-=-=-=-= ACTIVE TRENDS -=-=-=-=-==-=-=-");
 				for (int i = 0; i < activeTrends.size(); i++) {
 					System.out.println(activeTrends.get(i));
 				}

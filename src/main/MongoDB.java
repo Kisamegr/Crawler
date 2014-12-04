@@ -7,6 +7,7 @@ import java.util.Date;
 import twitter4j.Trend;
 import twitter4j.Trends;
 
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
@@ -73,6 +74,7 @@ public class MongoDB {
 
 		System.out.println("-=-=-=-=-=-=-=-=-");
 
+		System.out.println("\nTRENDS CHANGED");
 		if (!oldTrends.isEmpty()) {
 			for (Trend old : oldTrends) {
 				boolean found = false;
@@ -115,9 +117,14 @@ public class MongoDB {
 
 		DBCollection coll = db.getCollection("trends");
 
-		BasicDBObject query = new BasicDBObject("withdrawal", "not-finished");
-		// new BasicDBObject("$gte", "not-finished").append("$gte", new
-		// Date(System.currentTimeMillis() - 1000 * 60 * 60 * 2)));
+		BasicDBObject q1 = new BasicDBObject("withdrawal", "not-finished");
+		BasicDBObject q2 = new BasicDBObject("withdrawal", new BasicDBObject("$gte", new Date(System.currentTimeMillis() - 1000 * 600)));
+
+		BasicDBList or = new BasicDBList();
+		or.add(q1);
+		or.add(q2);
+
+		BasicDBObject query = new BasicDBObject("$or", or);
 
 		DBCursor cursor = trendsColl.find(query);
 
