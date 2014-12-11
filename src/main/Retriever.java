@@ -20,16 +20,19 @@ import twitter4j.TwitterStream;
 import twitter4j.TwitterStreamFactory;
 import twitter4j.conf.ConfigurationBuilder;
 
-public class Main {
+public class Retriever {
 
 	static int count;
 	static boolean streamRunning;
+	static double statusesCount = 0;
 
 	MongoDB mongo;
 	Twitter twitter;
 	TwitterStream twitterStream;
 
 	Timer timer;
+
+	ArrayList<String> activeTrends;
 
 	ExecutorService threadPool;
 
@@ -65,7 +68,16 @@ public class Main {
 
 				@Override
 				public void run() {
-					mongo.addStatus(s);
+					String text = arg0.getText().toLowerCase();
+					StringBuilder ctr = new StringBuilder();
+					for (String t : activeTrends) {
+						if (!t.startsWith("#") && text.contains(t.toLowerCase())) {
+							ctr.append(t + "\t");
+							// System.out.println(t);
+						}
+					}
+					mongo.addStatus(s, ctr.toString());
+					statusesCount++;
 				}
 
 			});
@@ -79,7 +91,7 @@ public class Main {
 
 	}
 
-	public Main() {
+	public Retriever() {
 
 		// Initialize stuff
 		count = 0;
@@ -118,12 +130,14 @@ public class Main {
 				}
 
 				System.out.println("\n\n\n\n\n----------- ITERATION " + count + " -----------");
+				System.out.println("Previous Statuses: " + statusesCount + "  Rate: " + statusesCount / 60);
+				statusesCount = 0;
 
 				mongo.updateTrends(trends, trends.getTrendAt());
 
 				System.out.println("\n\n");
 
-				ArrayList<String> activeTrends = mongo.getActiveTrends();
+				activeTrends = mongo.getActiveTrends();
 
 				String[] array = new String[activeTrends.size()];
 				array = activeTrends.toArray(array);
@@ -155,7 +169,6 @@ public class Main {
 	}
 
 	public static void main(String[] args) {
-		new Main();
+		new Retriever();
 	}
-
 }

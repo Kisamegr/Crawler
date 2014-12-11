@@ -136,10 +136,13 @@ public class MongoDB {
 		return trends;
 	}
 
-	public void addStatus(String statusJson) {
+	public void addStatus(String statusJson, String trends) {
 
-		DBObject status = (DBObject) JSON.parse(statusJson);
+		BasicDBObject status = (BasicDBObject) JSON.parse(statusJson);
 
+		status.append("trends", trends);
+		// BasicDBObject status = new BasicDBObject("json",
+		// json).append("trends", trends);
 		// System.out.println(statusJson);
 		try {
 			statusColl.insert(status);
@@ -147,6 +150,11 @@ public class MongoDB {
 		} catch (MongoException e) {
 			e.printStackTrace();
 		}
+	}
+
+	public DBCursor getStatusesCursor() {
+
+		return statusColl.find();
 	}
 
 }
