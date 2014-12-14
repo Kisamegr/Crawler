@@ -141,9 +141,19 @@ public class MongoDB {
 		BasicDBObject status = (BasicDBObject) JSON.parse(statusJson);
 
 		status.append("trends", trends);
-		// BasicDBObject status = new BasicDBObject("json",
-		// json).append("trends", trends);
-		// System.out.println(statusJson);
+
+		try {
+			statusColl.insert(status);
+
+		} catch (MongoException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void addStatus(String statusJson) {
+
+		BasicDBObject status = (BasicDBObject) JSON.parse(statusJson);
+
 		try {
 			statusColl.insert(status);
 
