@@ -1,12 +1,11 @@
 package main;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.Map.Entry;
 import java.util.Random;
 import java.util.TimerTask;
+
+import org.bson.types.BasicBSONList;
 
 import twitter4j.FilterQuery;
 import twitter4j.Status;
@@ -44,7 +43,7 @@ public class Inspector extends StreamingAPI {
 			long[] users = new long[selectedUsers.size()];
 
 			for (int i = 0; i < selectedUsers.size(); i++)
-				users[i] = selectedUsers.get(i);
+				users[i] = selectedUsers.get(i).longValue();
 
 			filter.follow(users);
 
@@ -63,10 +62,12 @@ public class Inspector extends StreamingAPI {
 
 	}
 
-	ArrayList<Long> selectedUsers;
+	ArrayList<Number> selectedUsers;
 
 	public Inspector() {
 		super();
+
+		System.out.println("Link Starto");
 
 		Random random = new Random(System.currentTimeMillis());
 
@@ -74,62 +75,84 @@ public class Inspector extends StreamingAPI {
 
 		HashMap<Number, Integer> countMap = new HashMap<>();
 
-		for (int i = 0; i < 5000 && cursor.hasNext(); i++) {
+		for (int i = 0; i < cursor.size(); i++) {
 
 			DBObject ob = cursor.next();
 			DBObject user = (BasicDBObject) ob.get("user");
 			Number id = (Number) user.get("id");
 
-			if (countMap.containsKey(id))
-				countMap.put(id, countMap.get(id) + 1);
-			else
-				countMap.put(id, 1);
+			DBObject entities = (BasicDBObject) ob.get("entities");
+			BasicBSONList hashtags = (BasicBSONList) entities.get("hashtags");
 
+			// hashtags.
+
+			String trends_str = (String) ob.get("trends");
+
+			String[] trends = trends_str.split("\t");
+
+			for (String t : trends) {
+				if (t != "")
+					mongo.addUniqueTrend(id.longValue(), t);
+			}
+
+			for (int n = 0; n < hashtags.size(); n++) {
+				String text = (String) ((DBObject) hashtags.get(n)).get("text");
+				if (text != "")
+					mongo.addUniqueTrend(id.longValue(), text);
+
+				mongo.addUniqueTrend(id.longValue(), "ARIBARIBARIBARIBA");
+			}
+
+			/*
+			 * if (countMap.containsKey(id)) countMap.put(id, countMap.get(id) +
+			 * 1); else countMap.put(id, 1);
+			 */
 		}
 
 		// for (java.util.Map.Entry<Number, Integer> e : countMap.entrySet()) {
 		// System.out.println(e.getKey() + "  -  " + e.getValue());
 		// }
-
-		System.out.println("Counted " + countMap.size() + " users.");
-		System.out.println("Sorting the hash map...");
-
-		ArrayList<Entry<Number, Integer>> countList = new ArrayList<>();
-
-		countList.addAll(countMap.entrySet());
-
-		Collections.sort(countList, new Comparator<Entry<Number, Integer>>() {
-
-			@Override
-			public int compare(Entry<Number, Integer> o1, Entry<Number, Integer> o2) {
-
-				return o1.getValue() - o2.getValue();
-			}
-
-		});
-
-		int Q1 = countList.size() / 4;
-		int Q2 = countList.size() / 2;
-		int Q3 = countList.size() * 3 / 4;
-
-		System.out.println(countList.size() * 3 / 4);
-		System.out.println("Q1 = " + countList.get(Q1).getValue());
-		System.out.println("Q2 = " + countList.get(Q2).getValue());
-		System.out.println("Q3 = " + countList.get(Q3).getValue());
-
-		System.out.println("\nFirst = " + countList.get(0).getValue());
-		System.out.println("Last = " + countList.get(countList.size() - 1).getValue());
-
-		selectedUsers = new ArrayList<>();
-
-		// Select 10 random users from each group
-		for (int i = 0; i < 4; i++)
-			for (int j = 0; j < 10; j++)
-				selectedUsers.add((Long) countList.get(random.nextInt(Q1) + i * Q1).getKey());
-
+		/*
+		 * System.out.println("Counted " + countMap.size() + " users.");
+		 * System.out.println("Sorting the hash map...");
+		 * 
+		 * ArrayList<Entry<Number, Integer>> countList = new ArrayList<>();
+		 * 
+		 * countList.addAll(countMap.entrySet());
+		 * 
+		 * Collections.sort(countList, new Comparator<Entry<Number, Integer>>()
+		 * {
+		 * 
+		 * @Override public int compare(Entry<Number, Integer> o1, Entry<Number,
+		 * Integer> o2) {
+		 * 
+		 * return o1.getValue() - o2.getValue(); }
+		 * 
+		 * });
+		 * 
+		 * int Q1 = countList.size() / 4; int Q2 = countList.size() / 2; int Q3
+		 * = countList.size() * 3 / 4;
+		 * 
+		 * System.out.println(countList.size() * 3 / 4);
+		 * System.out.println("Q1 = " + countList.get(Q1).getValue());
+		 * System.out.println("Q2 = " + countList.get(Q2).getValue());
+		 * System.out.println("Q3 = " + countList.get(Q3).getValue());
+		 * 
+		 * System.out.println("\nFirst = " + countList.get(0).getValue());
+		 * System.out.println("Last = " + countList.get(countList.size() -
+		 * 1).getValue());
+		 * 
+		 * selectedUsers = new ArrayList<>();
+		 * 
+		 * // Select 10 random users from each group for (int i = 0; i < 4; i++)
+		 * for (int j = 0; j < 10; j++)
+		 * selectedUsers.add(countList.get(random.nextInt(Q1) + i *
+		 * Q1).getKey());
+		 */
 	}
 
 	public static void main(String[] args) {
 		new Inspector();
+
 	}
 }

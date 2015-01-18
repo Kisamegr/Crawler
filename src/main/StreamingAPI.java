@@ -1,9 +1,9 @@
 package main;
 
-import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import twitter4j.StallWarning;
 import twitter4j.Status;
@@ -25,10 +25,9 @@ public abstract class StreamingAPI {
 	protected Twitter twitter;
 	protected TwitterStream twitterStream;
 
-	protected Timer timer;
 	protected long timerInterval;
 
-	protected ExecutorService threadPool;
+	protected ScheduledExecutorService threadPool;
 
 	protected Runnable mainRunnable;
 
@@ -36,8 +35,10 @@ public abstract class StreamingAPI {
 
 		@Override
 		public void onException(Exception arg0) {
-			// TODO Auto-generated method stub
-			arg0.printStackTrace();
+			Console.Log("Exception at Twitter Stream (2)");
+			Console.Log(arg0.getMessage());
+			Console.WriteExceptionDump(arg0, 0);
+
 		}
 
 		@Override
@@ -71,12 +72,13 @@ public abstract class StreamingAPI {
 
 	public StreamingAPI() {
 
+		Console.Log("Intializing Streaming API");
 		// Initialize stuff
 		count = 0;
 		streamRunning = false;
 
 		mongo = new MongoDB();
-		threadPool = Executors.newFixedThreadPool(4);
+		threadPool = Executors.newScheduledThreadPool(2);
 
 		ConfigurationBuilder cb = new ConfigurationBuilder();
 		cb.setDebugEnabled(true).setOAuthConsumerKey("9aLVgExqED52hm7GX1O0eg3PB").setOAuthConsumerSecret("bdRzvT0TcBegzdQKvfX7Y33zUZiZWD8uLfGP74Usy2E6oQ5XW1").setOAuthAccessToken("2693882078-8AMpx5CuBIUy7ObGD22N8i6RfttdWxorTUi2xww").setOAuthAccessTokenSecret("ymun3YG1RlJi48TFPUW7ZJcg3LZmPn2UbXef63EGxD1km");
@@ -90,18 +92,12 @@ public abstract class StreamingAPI {
 		twitterStream = new TwitterStreamFactory(cbs.build()).getInstance();
 		// twitterStream = new TwitterStreamFactory().getInstance();
 
-		timer = new Timer();
-		timerInterval = 60 * 1000;
-
+		timerInterval = 5 * 60 * 1000;
 	}
 
 	public void StartStreaming(TimerTask t) {
 		streamRunning = true;
-		timer.scheduleAtFixedRate(t, 0, timerInterval);
+		threadPool.scheduleAtFixedRate(t, 0, timerInterval, TimeUnit.MILLISECONDS);
 	}
 
-	public void StopStreaming() {
-		if (streamRunning)
-			timer.cancel();
-	}
 }

@@ -13,7 +13,7 @@ public class Receiver extends StreamingAPI {
 
 	protected ArrayList<String> activeTrends;
 
-	private class StatusHandlerReveiver extends StatusHandler {
+	private class StatusHandlerReceiver extends StatusHandler {
 
 		@Override
 		public void onStatus(Status arg0) {
@@ -57,20 +57,26 @@ public class Receiver extends StreamingAPI {
 		public void run() {
 			Trends trends = null;
 
+			Console.Log("");
+			Console.Log("ITERATION " + count + "--------");
+			Console.Log("Previous Statuses: " + statusesCount + "  Rate: " + statusesCount / 300);
+
 			try {
+
+				Console.Log("Fetching new trends");
 				trends = twitter.getPlaceTrends(1);
 			} catch (TwitterException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+
+				Console.Log("Failed to fetch new trends");
+				Console.Log(e.getErrorMessage());
+
+				Console.WriteExceptionDump(e, e.getErrorCode());
+
 			}
 
-			System.out.println("\n\n\n\n\n----------- ITERATION " + count + " -----------");
-			System.out.println("Previous Statuses: " + statusesCount + "  Rate: " + statusesCount / 60);
 			statusesCount = 0;
 
 			mongo.updateTrends(trends, trends.getTrendAt());
-
-			System.out.println("\n\n");
 
 			activeTrends = mongo.getActiveTrends();
 
@@ -84,28 +90,34 @@ public class Receiver extends StreamingAPI {
 
 				@Override
 				public void run() {
-					// TODO Auto-generated method stub
-					twitterStream.filter(filter);
 
-					// twitterStream.sample();
+					try {
+						twitterStream.filter(filter);
+					} catch (Exception e) {
+						Console.Log("Exception at Twitter Stream");
+						Console.Log(e.getMessage());
+						Console.WriteExceptionDump(e, 0);
+
+					}
+
 				}
 
 			});
-			System.out.println("-=-=-=-=-=-= ACTIVE TRENDS -=-=-=-=-==-=-=-");
+			Console.Log("| ACTIVE TRENDS");
 			for (int i = 0; i < activeTrends.size(); i++) {
-				System.out.println(activeTrends.get(i));
+				Console.Log("|  " + activeTrends.get(i));
 			}
 			count++;
 
 		}
-
 	}
 
 	public Receiver() {
 		super();
 
-		twitterStream.addListener(new StatusHandlerReveiver());
+		twitterStream.addListener(new StatusHandlerReceiver());
 
+		Console.Log("Start Running");
 		StartStreaming(new TimerTaskReceiver());
 
 	}
