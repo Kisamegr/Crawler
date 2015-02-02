@@ -3,14 +3,15 @@ package main;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Date;
-
-import org.bson.types.BasicBSONList;
+import java.util.List;
 
 import twitter4j.Trend;
 import twitter4j.Trends;
+import util.InspectedUser;
 
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.CommandResult;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBCursor;
@@ -26,6 +27,9 @@ public class MongoDB {
 	DBCollection trendsColl;
 	DBCollection statusColl;
 	DBCollection uniqueTrendsColl;
+	DBCollection followedColl;
+	DBCollection generalUserColl;
+	DBCollection inspectedUserColl;
 
 	ArrayList<Trend> oldTrends;
 
@@ -40,11 +44,16 @@ public class MongoDB {
 			trendsColl = db.getCollection("trends");
 			statusColl = db.getCollection("statuses");
 			uniqueTrendsColl = db.getCollection("unique_trends");
+			followedColl = db.getCollection("followed");
+			generalUserColl = db.getCollection("general_user");
+			inspectedUserColl = db.getCollection("inspected_user");
 
 			statusColl.createIndex(new BasicDBObject("index_id", "text"));
 
 			trendsColl.createIndex(new BasicDBObject("name", 1), new BasicDBObject("unique", true));
 			uniqueTrendsColl.createIndex(new BasicDBObject("user", 1).append("trend", 1), new BasicDBObject("unique", true));
+			generalUserColl.createIndex(new BasicDBObject("user", 1), new BasicDBObject("unique", true));
+			inspectedUserColl.createIndex(new BasicDBObject("user", 1), new BasicDBObject("unique", true));
 
 		} catch (UnknownHostException | MongoException e) {
 			Console.Log("Mongo Exception at Initializing");
@@ -139,7 +148,7 @@ public class MongoDB {
 			DBCollection coll = db.getCollection("trends");
 
 			BasicDBObject q1 = new BasicDBObject("withdrawal", "not-finished");
-			BasicDBObject q2 = new BasicDBObject("withdrawal", new BasicDBObject("$gte", new Date(System.currentTimeMillis() - 1000 * 600)));
+			BasicDBObject q2 = new BasicDBObject("withdrawal", new BasicDBObject("$gte", new Date(System.currentTimeMillis() - 1000 * 60 * 60 * 2)));
 
 			BasicDBList or = new BasicDBList();
 			or.add(q1);
@@ -207,36 +216,91 @@ public class MongoDB {
 		}
 	}
 
+	public void addFollowedStatus(String statusJson) {
+		BasicDBObject status = (BasicDBObject) JSON.parse(statusJson);
+
+		try {
+			followedColl.insert(status);
+
+		} catch (MongoException e) {
+			Console.Log("Mongo Exception Inserting Followed Status");
+			Console.Log(e.getMessage());
+		}
+	}
+
+	public void addGeneralUserInfo(long id, long age, int followers, int friends) {
+		BasicDBObject user = new BasicDBObject("user", id).append("age", age).append("followers", followers).append("friends", friends);
+
+		try {
+			generalUserColl.insert(user);
+
+		} catch (MongoException e) {
+			Console.Log("Mongo Exception Inserting Followed Status");
+			Console.Log(e.getMessage());
+		}
+	}
+
+	public void addInspectedUserInfo(InspectedUser user) {
+
+		BasicDBObject dbUser = new BasicDBObject();
+
+		dbUser.append("user", user.getId());
+		dbUser.append("tweets", user.getTweets());
+		dbUser.append("retweets", user.getRetweets());
+		dbUser.append("replies", user.getReplies());
+		dbUser.append("mentions", user.getUserMentions());
+		dbUser.append("retweeted", user.getRetweeted());
+		dbUser.append("hashtags", user.getHashtags());
+		dbUser.append("hashtagged", user.getHashtaggedTweets());
+		dbUser.append("url", user.getUrlTweets());
+		dbUser.append("retweets-mean", user.getRetweetPerTweetMean());
+		dbUser.append("hashtagged-percent", user.getHashtaggedTweetsPercent());
+		dbUser.append("url-percent", user.getUrlTweetsPercent());
+
+		try {
+			generalUserColl.insert(dbUser);
+
+		} catch (MongoException e) {
+			Console.Log("Mongo Exception Inserting Followed Status");
+			Console.Log(e.getMessage());
+		}
+	}
+
 	public DBCursor getStatusesCursor() {
 
 		return statusColl.find();// .limit(100);
 	}
 
-	public void testo() {
+	public DBCursor getStatusesCursor(BasicDBObject projection) {
 
-		DBCollection skatoules = db.getCollection("skata");
-
-		DBCursor c = skatoules.find();
-
-		for (int i = 0; i < c.size(); i++) {
-			DBObject o = c.next();
-
-			Object s = o.get("toules");
-
-			System.out.println(i + ":  " + s);
-
-			if (s instanceof BasicBSONList) {
-
-				BasicBSONList t = (BasicBSONList) s;
-
-				for (int gg = 0; gg < t.size(); gg++) {
-					String epitelous = (String) ((DBObject) t.get(gg)).get("taf");
-					System.out.println("TAF LIST:  " + epitelous);
-				}
-
-			}
-
-		}
-
+		return statusColl.find(new BasicDBObject(), projection);// .limit(100);
 	}
+
+	public DBCursor getUniqueTrendsCursorSorted() {
+		return uniqueTrendsColl.find().sort(new BasicDBObject("user", 1));
+	}
+
+	public DBCursor getFollowedStatusesCursor() {
+		return followedColl.find();
+	}
+
+	public DBCursor getFollowedStatusesCursor(long userID) {
+		return followedColl.find(new BasicDBObject("user.id", userID));
+	}
+
+	public long getStatuseColSize() {
+
+		CommandResult com = statusColl.getStats();
+
+		return com.getLong("size") / 1024 / 1024;
+	}
+
+	public List<Long> getUserIDs() {
+		return statusColl.distinct("user.id");
+	}
+
+	public List<Number> getInspectedUserIDs() {
+		return followedColl.distinct("user.id");
+	}
+
 }

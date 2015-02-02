@@ -55,10 +55,30 @@ public class Receiver extends StreamingAPI {
 
 		@Override
 		public void run() {
+
+			if (System.currentTimeMillis() - startTime > totalPeriod) {
+				Console.Log("Receiver Time has PASSED");
+				Console.Log("Terminating Receiver Execution");
+
+				StopStreaming();
+				return;
+			}
+
+			long dbSize = mongo.getStatuseColSize();
+
+			if (dbSize > 32000) {
+				Console.Log("Receiver Maximum Storage has reached its LIMIT");
+				Console.Log("Terminating Receiver Execution");
+
+				StopStreaming();
+				return;
+			}
+
 			Trends trends = null;
 
 			Console.Log("");
-			Console.Log("ITERATION " + count + "--------");
+			Console.Log("-------- ITERATION " + count + " --------");
+			Console.Log("Statuses Collection Size: " + dbSize + "mb");
 			Console.Log("Previous Statuses: " + statusesCount + "  Rate: " + statusesCount / 300);
 
 			try {
@@ -93,6 +113,7 @@ public class Receiver extends StreamingAPI {
 
 					try {
 						twitterStream.filter(filter);
+
 					} catch (Exception e) {
 						Console.Log("Exception at Twitter Stream");
 						Console.Log(e.getMessage());
@@ -118,7 +139,12 @@ public class Receiver extends StreamingAPI {
 		twitterStream.addListener(new StatusHandlerReceiver());
 
 		Console.Log("Start Running");
-		StartStreaming(new TimerTaskReceiver());
+
+		task = new TimerTaskReceiver();
+
+		totalPeriod = 1000 * 60 * 60 * 24 * 3;
+		startTime = System.currentTimeMillis();
+		StartStreaming();
 
 	}
 

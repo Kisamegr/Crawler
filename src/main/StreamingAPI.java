@@ -18,8 +18,9 @@ import twitter4j.conf.ConfigurationBuilder;
 public abstract class StreamingAPI {
 
 	static int count;
-	static boolean streamRunning;
 	static double statusesCount = 0;
+
+	public Object streamLock;
 
 	protected MongoDB mongo;
 	protected Twitter twitter;
@@ -30,6 +31,10 @@ public abstract class StreamingAPI {
 	protected ScheduledExecutorService threadPool;
 
 	protected Runnable mainRunnable;
+	protected TimerTask task;
+
+	protected long startTime;
+	protected long totalPeriod;
 
 	protected abstract class StatusHandler implements StatusListener {
 
@@ -75,29 +80,46 @@ public abstract class StreamingAPI {
 		Console.Log("Intializing Streaming API");
 		// Initialize stuff
 		count = 0;
-		streamRunning = false;
+		streamLock = new Object();
 
 		mongo = new MongoDB();
 		threadPool = Executors.newScheduledThreadPool(2);
 
 		ConfigurationBuilder cb = new ConfigurationBuilder();
-		cb.setDebugEnabled(true).setOAuthConsumerKey("9aLVgExqED52hm7GX1O0eg3PB").setOAuthConsumerSecret("bdRzvT0TcBegzdQKvfX7Y33zUZiZWD8uLfGP74Usy2E6oQ5XW1").setOAuthAccessToken("2693882078-8AMpx5CuBIUy7ObGD22N8i6RfttdWxorTUi2xww").setOAuthAccessTokenSecret("ymun3YG1RlJi48TFPUW7ZJcg3LZmPn2UbXef63EGxD1km");
+		// Stratos key
+		// cb.setDebugEnabled(true).setOAuthConsumerKey("9aLVgExqED52hm7GX1O0eg3PB").setOAuthConsumerSecret("bdRzvT0TcBegzdQKvfX7Y33zUZiZWD8uLfGP74Usy2E6oQ5XW1").setOAuthAccessToken("2693882078-8AMpx5CuBIUy7ObGD22N8i6RfttdWxorTUi2xww").setOAuthAccessTokenSecret("ymun3YG1RlJi48TFPUW7ZJcg3LZmPn2UbXef63EGxD1km");
+
+		// Tanaskey
+		cb.setDebugEnabled(true).setOAuthConsumerKey("sLCVaE4Md4rjm77re9MK95rnx").setOAuthConsumerSecret("ETwTOyW2GB5qMo2rvWw0p43zBkGXrz6UO45PKaiRDzLzDXM4pS").setOAuthAccessToken("842087294-hPnJnipEn3FigOekqTb18IT0H4QVe03wTn2ljn9p").setOAuthAccessTokenSecret("PnFIAoRSaPbsQbK2cwB35fpRYDtBV4uEbjYlu6E85Rb7V");
 
 		twitter = new TwitterFactory(cb.build()).getInstance();
-
 		ConfigurationBuilder cbs = new ConfigurationBuilder();
+
+		// Stratos key
 		cbs.setPrettyDebugEnabled(true).setOAuthConsumerKey("3c1m6Ui0nK5UF9cDZ9ODOEKL6").setOAuthConsumerSecret("PszUJ0IepNaLVYVMjZxTtVDZHuk8lJvaDrv1ohN22ruTEHbjZD").setOAuthAccessToken("2693882078-1Kx8nF7IsYLMCxja44LCTOcHnKoyHTdEwGmUHgQ").setOAuthAccessTokenSecret("BrnTB3kn99vaoc3714NJmKJxbuWRIuJAtwjtFZWeiQssb");
+
 		cbs.setJSONStoreEnabled(true);
 
 		twitterStream = new TwitterStreamFactory(cbs.build()).getInstance();
 		// twitterStream = new TwitterStreamFactory().getInstance();
 
 		timerInterval = 5 * 60 * 1000;
+
 	}
 
-	public void StartStreaming(TimerTask t) {
-		streamRunning = true;
-		threadPool.scheduleAtFixedRate(t, 0, timerInterval, TimeUnit.MILLISECONDS);
+	public void StartStreaming() {
+		threadPool.scheduleAtFixedRate(task, 0, timerInterval, TimeUnit.MILLISECONDS);
+	}
+
+	public void StopStreaming() {
+		task.cancel();
+		threadPool.shutdown();
+		twitterStream.cleanUp();
+
+		synchronized (streamLock) {
+			streamLock.notify();
+		}
+
 	}
 
 }
