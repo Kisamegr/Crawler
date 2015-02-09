@@ -20,6 +20,7 @@ import com.mongodb.DBObject;
 
 public class Exctractor extends StreamingAPI {
 
+	// This hashmap holds the InspectedUser objects for each inspected user chosen in the Inspector class
 	HashMap<Long, InspectedUser> userMap = new HashMap<>();
 
 	public Exctractor() {
@@ -28,8 +29,10 @@ public class Exctractor extends StreamingAPI {
 
 			Console.Log("----- Started Extractor -----");
 
+			/* Extract data from the statuses */
+
 			Console.Log("Extracting General User Info...");
-			// ExtractGeneralUserInfo();
+			ExtractGeneralUserInfo();
 
 			Console.Log("Extracting Inspected User Info...");
 			ExtractInspectedUserInfo();
@@ -50,27 +53,36 @@ public class Exctractor extends StreamingAPI {
 
 	}
 
+	// Extract the basic stats for each user
 	public void ExtractGeneralUserInfo() throws TwitterException {
 		DBCursor cursor = mongo.getStatusesCursor(new BasicDBObject("trends", 0).append("index_id", 0));
 
 		long currentTime = System.currentTimeMillis();
 
+		// For each status saved from the Receiver Class...
 		for (int i = 0; i < cursor.size(); i++) {
+
 			DBObject obj = cursor.next();
+
+			// Make a status object from the JSON
 			Status status = TwitterObjectFactory.createStatus(obj.toString());
 
+			// Get the user from the status object
 			User user = status.getUser();
 
-			// System.out.println(obj.toString());
+			// Get the stats
 			long age = currentTime - user.getCreatedAt().getTime();
 			int followers = user.getFollowersCount();
 			int friends = user.getFriendsCount();
+
+			// Save them to the Mongo Database
 			mongo.addGeneralUserInfo(user.getId(), age, followers, friends);
 
 		}
 
 	}
 
+	// Extract the stats for each inspected user
 	public void ExtractInspectedUserInfo() throws TwitterException {
 		HashMap<Long, HashMap<String, Integer>> sourcesCounter = new HashMap<>();
 
@@ -78,13 +90,20 @@ public class Exctractor extends StreamingAPI {
 
 		DBCursor cursor = mongo.getFollowedStatusesCursor();
 
+		// For each status saved from the Inspector Class...
 		for (int i = 0; i < cursor.count(); i++) {
 			DBObject obj = cursor.next();
+
+			// Make a status object from the JSON
 			Status status = TwitterObjectFactory.createStatus(obj.toString());
 
+			// Get the user
 			long id = status.getUser().getId();
+
 			InspectedUser user;
 
+			// If the user does not exist in the user map, then add him.
+			// If the user exists, then get his InspectedUser Object
 			if (!userMap.containsKey(id)) {
 
 				user = new InspectedUser();
@@ -92,6 +111,8 @@ public class Exctractor extends StreamingAPI {
 				userMap.put(id, user);
 			} else
 				user = userMap.get(id);
+
+			/* Add all his stats into the his InspectedUser Object */
 
 			user.setFollowers(status.getUser().getFollowersCount());
 			user.setFriends(status.getUser().getFriendsCount());
@@ -115,14 +136,17 @@ public class Exctractor extends StreamingAPI {
 			if (status.getURLEntities().length > 0)
 				user.addUrlTweets();
 
+			// Get his source
 			String fullSource = status.getSource();
 			String source = fullSource.split("<|>")[2];
 
+			// Add the user's source map to the general source map
 			if (!sourcesCounter.containsKey(user.getId()))
 				sourcesCounter.put(user.getId(), new HashMap<String, Integer>());
 
 			HashMap<String, Integer> userSourceMap = sourcesCounter.get(user.getId());
 
+			// Add 1 to the user's source map, in order to find his max source later
 			if (userSourceMap.containsKey(source))
 				userSourceMap.put(source, userSourceMap.get(source) + 1);
 			else
@@ -130,6 +154,7 @@ public class Exctractor extends StreamingAPI {
 
 		}
 
+		// Count the frequency of each source for each user and add his max source
 		for (Entry<Long, HashMap<String, Integer>> userSources : sourcesCounter.entrySet()) {
 
 			String maxSource = null;
@@ -146,7 +171,7 @@ public class Exctractor extends StreamingAPI {
 
 		}
 
-		// Delete users that have only a few tweets / Noise
+		// Delete users that have only a few tweets / Reduce Noise
 		Iterator<Entry<Long, InspectedUser>> it = userMap.entrySet().iterator();
 		while (it.hasNext()) {
 			Entry<Long, InspectedUser> en = it.next();
@@ -157,31 +182,39 @@ public class Exctractor extends StreamingAPI {
 
 	}
 
+	// Find the duplicates for each inspected user
 	public void FindDuplicates() throws TwitterException {
 		List<Number> userList = mongo.getInspectedUserIDs();
 
+		// For each inspected user id...
 		for (Number userID : userList) {
 
+			// Get the InspectedUser Object from the map
 			InspectedUser user = userMap.get(userID.longValue());
 
+			// If the object exists... (means the user has not been cut as noise)
 			if (user != null) {
 
 				DBCursor cursor = mongo.getFollowedStatusesCursor(userID.longValue());
+
+				// Hold the processed statuses here
 				ArrayList<String> twitch = new ArrayList<>();
 
+				// For each status of this user...
 				for (int i = 0; i < cursor.size(); i++) {
 					DBObject obj = cursor.next();
 
+					// Create a status object from the JSON
 					Status status = TwitterObjectFactory.createStatus(obj.toString());
 
-					// System.out.println(status.getText());
-
+					// If the status is not a retweet or reply, meaning it is a normal tweet
 					if (!status.isRetweet() && status.getInReplyToUserId() == -1) {
 
 						StringBuilder tweet = new StringBuilder();
 
 						tweet.append(status.getText());
 
+						// Remove the user mentions
 						for (UserMentionEntity mention : status.getUserMentionEntities()) {
 							int index_start = tweet.indexOf(mention.getText());
 
@@ -189,6 +222,7 @@ public class Exctractor extends StreamingAPI {
 								tweet.delete(index_start, index_start + mention.getText().length());
 						}
 
+						// Remove the urls
 						for (URLEntity url : status.getURLEntities()) {
 							int index_start = tweet.indexOf(url.getText());
 
@@ -196,12 +230,14 @@ public class Exctractor extends StreamingAPI {
 								tweet.delete(index_start, index_start + url.getText().length());
 						}
 
+						// Hold the processed status
 						twitch.add(tweet.toString());
 
 					}
 				}
 				int totalSimilar = 0;
 
+				// Find the Lev Distances between each status and count the similars
 				for (int x = 0; x < twitch.size(); x++) {
 					for (int y = x + 1; y < twitch.size(); y++) {
 						float percent = LevenshteinDistance(twitch.get(x), twitch.get(y));
@@ -212,6 +248,7 @@ public class Exctractor extends StreamingAPI {
 					}
 				}
 
+				// Add the duplicate statuses percent into the user's object
 				if (twitch.size() > 0)
 					user.setDuplicateRatio((double) totalSimilar / twitch.size());
 				else
@@ -221,6 +258,7 @@ public class Exctractor extends StreamingAPI {
 
 	}
 
+	// Save the stats of the inspected users into the Mongo Database
 	public void SaveInspectedUsersMongo() {
 
 		for (Entry<Long, InspectedUser> entry : userMap.entrySet()) {
@@ -234,6 +272,8 @@ public class Exctractor extends StreamingAPI {
 
 	}
 
+	// NOT IMPLEMENTED BY US - FOUND ON THE INTERNET
+	// Calculate the distance
 	public float LevenshteinDistance(String s0, String s1) {
 		int len0 = s0.length() + 1;
 		int len1 = s1.length() + 1;
