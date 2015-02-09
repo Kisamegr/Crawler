@@ -2,6 +2,7 @@ package main;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 
@@ -145,10 +146,12 @@ public class Exctractor extends StreamingAPI {
 
 		}
 
-		// Delete users that have only a few tweets
-		for (Entry<Long, InspectedUser> en : userMap.entrySet()) {
+		// Delete users that have only a few tweets / Noise
+		Iterator<Entry<Long, InspectedUser>> it = userMap.entrySet().iterator();
+		while (it.hasNext()) {
+			Entry<Long, InspectedUser> en = it.next();
 			if (en.getValue().getTweets() + en.getValue().getRetweets() < 5)
-				userMap.remove(en.getKey());
+				it.remove();
 
 		}
 
@@ -159,57 +162,61 @@ public class Exctractor extends StreamingAPI {
 
 		for (Number userID : userList) {
 
-			DBCursor cursor = mongo.getFollowedStatusesCursor(userID.longValue());
-			ArrayList<String> twitch = new ArrayList<>();
+			InspectedUser user = userMap.get(userID.longValue());
 
-			for (int i = 0; i < cursor.size(); i++) {
-				DBObject obj = cursor.next();
+			if (user != null) {
 
-				Status status = TwitterObjectFactory.createStatus(obj.toString());
+				DBCursor cursor = mongo.getFollowedStatusesCursor(userID.longValue());
+				ArrayList<String> twitch = new ArrayList<>();
 
-				// System.out.println(status.getText());
+				for (int i = 0; i < cursor.size(); i++) {
+					DBObject obj = cursor.next();
 
-				if (!status.isRetweet() && status.getInReplyToUserId() == -1) {
+					Status status = TwitterObjectFactory.createStatus(obj.toString());
 
-					StringBuilder tweet = new StringBuilder();
+					// System.out.println(status.getText());
 
-					tweet.append(status.getText());
+					if (!status.isRetweet() && status.getInReplyToUserId() == -1) {
 
-					for (UserMentionEntity mention : status.getUserMentionEntities()) {
-						int index_start = tweet.indexOf(mention.getText());
+						StringBuilder tweet = new StringBuilder();
 
-						if (index_start != -1)
-							tweet.delete(index_start, index_start + mention.getText().length());
+						tweet.append(status.getText());
+
+						for (UserMentionEntity mention : status.getUserMentionEntities()) {
+							int index_start = tweet.indexOf(mention.getText());
+
+							if (index_start != -1)
+								tweet.delete(index_start, index_start + mention.getText().length());
+						}
+
+						for (URLEntity url : status.getURLEntities()) {
+							int index_start = tweet.indexOf(url.getText());
+
+							if (index_start != -1)
+								tweet.delete(index_start, index_start + url.getText().length());
+						}
+
+						twitch.add(tweet.toString());
+
 					}
+				}
+				int totalSimilar = 0;
 
-					for (URLEntity url : status.getURLEntities()) {
-						int index_start = tweet.indexOf(url.getText());
+				for (int x = 0; x < twitch.size(); x++) {
+					for (int y = x + 1; y < twitch.size(); y++) {
+						float percent = LevenshteinDistance(twitch.get(x), twitch.get(y));
+						// System.out.println(percent);
+						if (percent < 0.1)
+							totalSimilar++;
 
-						if (index_start != -1)
-							tweet.delete(index_start, index_start + url.getText().length());
 					}
-
-					twitch.add(tweet.toString());
-
 				}
+
+				if (twitch.size() > 0)
+					user.setDuplicateRatio((double) totalSimilar / twitch.size());
+				else
+					user.setDuplicateRatio(0);
 			}
-			int totalSimilar = 0;
-
-			for (int x = 0; x < twitch.size(); x++) {
-				for (int y = x + 1; y < twitch.size(); y++) {
-					float percent = LevenshteinDistance(twitch.get(x), twitch.get(y));
-					// System.out.println(percent);
-					if (percent < 0.1)
-						totalSimilar++;
-
-				}
-			}
-
-			if (twitch.size() > 0)
-				userMap.get(userID.longValue()).setDuplicateRatio((double) totalSimilar / twitch.size());
-			else
-				userMap.get(userID.longValue()).setDuplicateRatio(0);
-
 		}
 
 	}
