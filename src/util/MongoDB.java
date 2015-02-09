@@ -1,13 +1,13 @@
-package main;
+package util;
 
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import main.Console;
 import twitter4j.Trend;
 import twitter4j.Trends;
-import util.InspectedUser;
 
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -30,6 +30,7 @@ public class MongoDB {
 	DBCollection followedColl;
 	DBCollection generalUserColl;
 	DBCollection inspectedUserColl;
+	DBCollection userScoreColl;
 
 	ArrayList<Trend> oldTrends;
 
@@ -45,8 +46,9 @@ public class MongoDB {
 			statusColl = db.getCollection("statuses");
 			uniqueTrendsColl = db.getCollection("unique_trends");
 			followedColl = db.getCollection("followed");
-			generalUserColl = db.getCollection("general_user");
-			inspectedUserColl = db.getCollection("inspected_user");
+			generalUserColl = db.getCollection("general_users");
+			inspectedUserColl = db.getCollection("inspected_users");
+			userScoreColl = db.getCollection("users_score");
 
 			statusColl.createIndex(new BasicDBObject("index_id", "text"));
 
@@ -54,6 +56,7 @@ public class MongoDB {
 			uniqueTrendsColl.createIndex(new BasicDBObject("user", 1).append("trend", 1), new BasicDBObject("unique", true));
 			generalUserColl.createIndex(new BasicDBObject("user", 1), new BasicDBObject("unique", true));
 			inspectedUserColl.createIndex(new BasicDBObject("user", 1), new BasicDBObject("unique", true));
+			userScoreColl.createIndex(new BasicDBObject("user", 1), new BasicDBObject("unique", true));
 
 		} catch (UnknownHostException | MongoException e) {
 			Console.Log("Mongo Exception at Initializing");
@@ -235,8 +238,10 @@ public class MongoDB {
 			generalUserColl.insert(user);
 
 		} catch (MongoException e) {
-			Console.Log("Mongo Exception Inserting Followed Status");
-			Console.Log(e.getMessage());
+			if (e.getCode() != 11000) { // Ignore duplicated insert error
+				Console.Log("Mongo Exception Inserting General User Info");
+				Console.Log(e.getMessage());
+			}
 		}
 	}
 
@@ -245,24 +250,48 @@ public class MongoDB {
 		BasicDBObject dbUser = new BasicDBObject();
 
 		dbUser.append("user", user.getId());
+		dbUser.append("followers", user.getFollowers());
+		dbUser.append("friends", user.getFriends());
+		dbUser.append("age", user.getAge());
 		dbUser.append("tweets", user.getTweets());
 		dbUser.append("retweets", user.getRetweets());
 		dbUser.append("replies", user.getReplies());
 		dbUser.append("mentions", user.getUserMentions());
-		dbUser.append("retweeted", user.getRetweeted());
 		dbUser.append("hashtags", user.getHashtags());
 		dbUser.append("hashtagged", user.getHashtaggedTweets());
 		dbUser.append("url", user.getUrlTweets());
-		dbUser.append("retweets-mean", user.getRetweetPerTweetMean());
-		dbUser.append("hashtagged-percent", user.getHashtaggedTweetsPercent());
-		dbUser.append("url-percent", user.getUrlTweetsPercent());
+		dbUser.append("dup-ratio", user.getDuplicateRatio());
+		dbUser.append("source", user.getMaxSource());
+		// dbUser.append("retweets-mean", user.getRetweetPerTweetMean());
+		// dbUser.append("hashtagged-percent",
+		// user.getHashtaggedTweetsPercent());
+		// dbUser.append("url-percent", user.getUrlTweetsPercent());
+		// dbUser.append("duplicate-ratio", user.getDuplicateRatio());
+		// dbUser.append("mention-ratio", user.getMentionPercent());
 
 		try {
-			generalUserColl.insert(dbUser);
+			inspectedUserColl.insert(dbUser);
 
 		} catch (MongoException e) {
-			Console.Log("Mongo Exception Inserting Followed Status");
-			Console.Log(e.getMessage());
+
+			if (e.getCode() != 11000) { // Ignore duplicated insert error
+				Console.Log("Mongo Exception Inserting Inspected User Info");
+				Console.Log(e.getMessage());
+			}
+		}
+	}
+
+	public void addUserScore(long id, double score) {
+		BasicDBObject sc = new BasicDBObject("user", id).append("score", score);
+
+		try {
+			userScoreColl.insert(sc);
+
+		} catch (MongoException e) {
+			if (e.getCode() != 11000) { // Ignore duplicated insert error
+				Console.Log("Mongo Exception Inserting User Score");
+				Console.Log(e.getMessage());
+			}
 		}
 	}
 
@@ -288,6 +317,29 @@ public class MongoDB {
 		return followedColl.find(new BasicDBObject("user.id", userID));
 	}
 
+	public DBCursor getInspectedUsersCursor() {
+		return inspectedUserColl.find();
+	}
+
+	public DBCursor getGeneralUsersCursor() {
+		return generalUserColl.find();
+	}
+
+	public DBCursor getUserScoreCursor() {
+		return userScoreColl.find();
+	}
+
+	public double findUserScore(long userID) {
+
+		DBCursor c = userScoreColl.find(new BasicDBObject("user", userID));
+
+		if (c.hasNext())
+			return (double) c.next().get("score");
+
+		return -1;
+
+	}
+
 	public long getStatuseColSize() {
 
 		CommandResult com = statusColl.getStats();
@@ -301,6 +353,30 @@ public class MongoDB {
 
 	public List<Number> getInspectedUserIDs() {
 		return followedColl.distinct("user.id");
+	}
+
+	public void YEAH(long[] users) {
+
+		DBCollection usersCol = db.getCollection("users");
+
+		usersCol.createIndex(new BasicDBObject("user", 1), new BasicDBObject("unique", true));
+
+		BasicDBObject ub;
+
+		for (long u : users) {
+			ub = new BasicDBObject("user", u);
+
+			try {
+
+				usersCol.insert(ub);
+			} catch (MongoException e) {
+
+				if (e.getCode() != 11000) { // Ignore duplicated insert error
+					Console.Log("Mongo Exception NANANNANANNAN");
+					Console.Log(e.getMessage());
+				}
+			}
+		}
 	}
 
 }

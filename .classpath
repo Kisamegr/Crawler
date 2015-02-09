@@ -11,5 +11,8 @@
 			<attribute name="javadoc_location" value="jar:file:/C:/Users/Stratos/Google%20Drive/Eclipse/Crawler/lib/twitter4j-stream-4.0.2-javadoc.jar!/"/>
 		</attributes>
 	</classpathentry>
+	<classpathentry kind="lib" path="lib/jcommon-1.0.23.jar"/>
+	<classpathentry kind="lib" path="lib/jfreechart-1.0.19-swt.jar"/>
+	<classpathentry kind="lib" path="lib/jfreechart-1.0.19.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

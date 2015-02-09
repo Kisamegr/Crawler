@@ -20,36 +20,33 @@ import com.mongodb.DBObject;
 public class Exctractor extends StreamingAPI {
 
 	HashMap<Long, InspectedUser> userMap = new HashMap<>();
-	private HashMap<Long, Float> levenDistances;
-
-	private String theSource;
 
 	public Exctractor() {
-		levenDistances = new HashMap<>();
 
 		try {
 
-			// ExtractGeneralUserInfo();
-			ExtractInspectedUserInfo();
-			// FindCopycats();
+			Console.Log("----- Started Extractor -----");
 
-			for (Entry<Long, InspectedUser> user : userMap.entrySet()) {
-				System.out.println(user.toString());
-			}
+			Console.Log("Extracting General User Info...");
+			// ExtractGeneralUserInfo();
+
+			Console.Log("Extracting Inspected User Info...");
+			ExtractInspectedUserInfo();
+
+			Console.Log("Finding Inspected Users Duplicates...");
+			FindDuplicates();
+
+			SaveInspectedUsersMongo();
 
 		} catch (TwitterException e) {
 			// TODO Auto-generated catch block
+			Console.Log("Error @Extractor");
 			if (e.isCausedByNetworkIssue()) {
-				Console.Log("Error looking up a User @Extractor");
 				Console.WriteExceptionDump(e, e.getErrorCode());
 
 			}
-			e.printStackTrace();
 		}
 
-		for (Entry<Long, Float> e : levenDistances.entrySet()) {
-			System.out.println(e.getKey() + "  -  " + e.getValue());
-		}
 	}
 
 	public void ExtractGeneralUserInfo() throws TwitterException {
@@ -76,9 +73,9 @@ public class Exctractor extends StreamingAPI {
 	public void ExtractInspectedUserInfo() throws TwitterException {
 		HashMap<Long, HashMap<String, Integer>> sourcesCounter = new HashMap<>();
 
-		DBCursor cursor = mongo.getFollowedStatusesCursor();
+		long currentTime = System.currentTimeMillis();
 
-		System.out.println(cursor.size());
+		DBCursor cursor = mongo.getFollowedStatusesCursor();
 
 		for (int i = 0; i < cursor.count(); i++) {
 			DBObject obj = cursor.next();
@@ -88,11 +85,16 @@ public class Exctractor extends StreamingAPI {
 			InspectedUser user;
 
 			if (!userMap.containsKey(id)) {
+
 				user = new InspectedUser();
 				user.setId(id);
 				userMap.put(id, user);
 			} else
 				user = userMap.get(id);
+
+			user.setFollowers(status.getUser().getFollowersCount());
+			user.setFriends(status.getUser().getFriendsCount());
+			user.setAge(currentTime - status.getUser().getCreatedAt().getTime());
 
 			if (!status.isRetweet())
 				user.addTweets();
@@ -104,8 +106,6 @@ public class Exctractor extends StreamingAPI {
 
 			user.addUserMentions(status.getUserMentionEntities().length);
 
-			user.addRetweeted(status.getRetweetCount());
-
 			user.addHashtags(status.getHashtagEntities().length);
 
 			if (status.getHashtagEntities().length > 0)
@@ -114,7 +114,8 @@ public class Exctractor extends StreamingAPI {
 			if (status.getURLEntities().length > 0)
 				user.addUrlTweets();
 
-			String source = status.getSource();
+			String fullSource = status.getSource();
+			String source = fullSource.split("<|>")[2];
 
 			if (!sourcesCounter.containsKey(user.getId()))
 				sourcesCounter.put(user.getId(), new HashMap<String, Integer>());
@@ -144,12 +145,17 @@ public class Exctractor extends StreamingAPI {
 
 		}
 
+		// Delete users that have only a few tweets
+		for (Entry<Long, InspectedUser> en : userMap.entrySet()) {
+			if (en.getValue().getTweets() + en.getValue().getRetweets() < 5)
+				userMap.remove(en.getKey());
+
+		}
+
 	}
 
-	public void FindCopycats() throws TwitterException {
+	public void FindDuplicates() throws TwitterException {
 		List<Number> userList = mongo.getInspectedUserIDs();
-
-		System.out.println(userList);
 
 		for (Number userID : userList) {
 
@@ -200,16 +206,24 @@ public class Exctractor extends StreamingAPI {
 			}
 
 			if (twitch.size() > 0)
-				levenDistances.put(userID.longValue(), (float) totalSimilar / twitch.size());
+				userMap.get(userID.longValue()).setDuplicateRatio((double) totalSimilar / twitch.size());
 			else
-				levenDistances.put(userID.longValue(), (float) 0);
+				userMap.get(userID.longValue()).setDuplicateRatio(0);
 
 		}
 
 	}
 
+	public void SaveInspectedUsersMongo() {
+
+		for (Entry<Long, InspectedUser> entry : userMap.entrySet()) {
+			mongo.addInspectedUserInfo(entry.getValue());
+		}
+	}
+
 	public static void main(String[] args) {
 		new Exctractor();
+		new Analyzer();
 
 	}
 

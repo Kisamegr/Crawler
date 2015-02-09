@@ -66,7 +66,10 @@ public class Inspector extends StreamingAPI {
 				users[i++] = it.next();
 			}
 
+			mongo.YEAH(users);
+
 			filter.follow(users);
+			Console.Log("Total Users: " + users.length);
 
 			threadPool.submit(new Runnable() {
 
