@@ -14,7 +14,7 @@ public class Receiver extends StreamingAPI {
 	protected ArrayList<String> activeTrends;
 
 	// Class that extends the Status Handler and overrides the onStatus method
-	// in order to manage each status from the Streaming API
+	// in order to manage each status received from the Streaming API
 	private class StatusHandlerReceiver extends StatusHandler {
 
 		@Override
