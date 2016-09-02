@@ -12,4 +12,24 @@ The assignment was to develop a **JAVA** application, using **Twitter's Rest & S
  - Statistical Analysis and presentation on the resulting data.
  
 
+## Results:
+
+![Alt text](/plots/general_users_scatterplot.png?raw=true "Followers/Friends Ratio")
+
 ![Alt text](/plots/piecharts/pie_sources_legit.png?raw=true "Tweet Sources")
+
+![Alt text](/plots/scatterplots/scatter0-Total Score.png?raw=true "Fraud Score")
+
+![Alt text](/plots/scatterplots/scatter1-Reputation Score.png?raw=true "Reputation Score")
+
+![Alt text](/plots/scatterplots/scatter2-URL Score.png.png?raw=true "URL Score")
+
+![Alt text](/plots/scatterplots/scatter3-Hashtag Score.png?raw=true "Hashtag Score")
+
+![Alt text](/plots/scatterplots/scatter4-Mention Score.png.png?raw=true "Tweet Mention Score")
+
+![Alt text](/plots/scatterplots/scatter5-Duplicates Score.png?raw=true "Duplicate Tweets Score")
+
+![Alt text](/plots/scatterplots/scatter6-Retweeted Score.png?raw=true "Retweet Score")
+
+
