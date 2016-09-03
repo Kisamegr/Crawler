@@ -1,4 +1,4 @@
-# Twitter Fraud Detection Reasearch
+# Twitter Fraud Detection Research
 
 ## Semester project for the *Worldwide Web Information Systems* academic course.
 
