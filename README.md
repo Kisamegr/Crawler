@@ -18,6 +18,8 @@ The assignment was to develop a **JAVA** application, using **Twitter's Rest & S
 
 ![Alt text](/plots/piecharts/pie_sources_legit.png?raw=true "Tweet Sources")
 
+![Alt text](/plots/piecharts/pie_sources_scam.png?raw=true "Tweet Sources")
+
 ![Alt text](/plots/scatterplots/scatter0-Total Score.png)
 
 ![Alt text](/plots/scatterplots/scatter1-Reputation Score.png?raw=true "Reputation Score")
